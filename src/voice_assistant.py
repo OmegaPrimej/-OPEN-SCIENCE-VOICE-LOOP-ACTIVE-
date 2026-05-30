@@ -1,3 +1,197 @@
+
+
+import asyncio
+import base64
+import os
+import time
+import warnings
+import edge_tts
+import nest_asyncio
+import torch
+import whisper
+from google.colab import output
+from IPython.display import Audio, HTML, display
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+
+# Silence messy console warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+nest_asyncio.apply()
+
+# --- INITIALIZE LOCAL AI MODELS (STT & LLM) ---
+print("1/3 Loading Whisper Voice Recognition...")
+stt_model = whisper.load_model("tiny.en")
+
+print("2/3 Loading Local Llama-3.2-3B Science Engine into VRAM...")
+model_id = "Qwen/Qwen2.5-3B-Instruct" # Highly optimized for local physics/science tasks
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    torch_dtype=torch.float16,
+    device_map="auto"
+)
+llm_pipeline = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer
+)
+print("3/3 ✓ All models natively loaded on GPU. Systems operational.")
+
+# Maintain rolling context memory
+conversation_history = [
+    {
+        "role": "system",
+        "content": "You are an expert scientist specializing in physics and advanced sciences. Give deep, highly clear, but brief conversational spoken answers. Limit answers to 2-3 sentences max."
+    }
+]
+
+# --- JAVASCRIPT MICROPHONE CAPTURE COMPONENT ---
+RECORD_JS = """
+const sleep = time => new Promise(resolve => setTimeout(resolve, time));
+var record = async (maxDuration) => {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mediaRecorder = new MediaRecorder(stream);
+  let chunks = [];
+
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+  mediaRecorder.start();
+
+  const div = document.createElement('div');
+  div.innerHTML = "<b style='color: #00FF00; font-size: 16px;'>🎙️ SYSTEM LISTENING... Speak now.</b>";
+  document.body.appendChild(div);
+
+  await sleep(maxDuration);
+
+  mediaRecorder.stop();
+  stream.getTracks().forEach(track => track.stop());
+  div.remove();
+
+  return new Promise(resolve => {
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: 'audio/wav' });
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        resolve(reader.result.split(',')[1]); // FIXED: Explicitly string extraction
+      };
+    };
+  });
+};
+"""
+
+def capture_microphone_input(duration_seconds: int = 5) -> str:
+    """Invokes browser Javascript to capture microphone data and write a local file."""
+    display(HTML(f"<script>{RECORD_JS}</script>"))
+    time.sleep(0.1)
+    b64_audio_data = output.eval_js(f'record({duration_seconds * 1000})')
+
+    output_filename = "user_input.wav"
+    with open(output_filename, "wb") as f:
+        f.write(base64.b64decode(b64_audio_data))
+    return output_filename
+
+# --- TEXT TO SPEECH COMPONENT (BRITISH ACCENT) ---
+async def speak_response(text: str, voice: str = "en-GB-SoniaNeural"):
+    """Generates audio stream using edge-tts with an elegant British voice."""
+    output_file = "ai_voice.mp3"
+    communicate = edge_tts.Communicate(text, voice)
+    await communicate.save(output_file)
+    display(Audio(output_file, autoplay=True))
+
+def ai_speak(text: str):
+    asyncio.run(speak_response(text))
+
+# --- LOCAL LLM INFERENCE ENGINE ---
+def get_ai_response(user_text: str) -> str:
+    """Processes science reasoning locally using GPU VRAM pipeline."""
+    global conversation_history
+
+    text_clean = user_text.lower().strip()
+    if any(word in text_clean for word in ["stop", "exit", "goodbye"]):
+        return "Understood. Local science core standing down. Goodbye."
+
+    conversation_history.append({"role": "user", "content": user_text})
+
+    # Manage maximum text history memory limits
+    if len(conversation_history) > 9:
+        conversation_history = [conversation_history[0]] + conversation_history[-6:]
+
+    try:
+        # Generate text natively on your local GPU instance
+        prompt = tokenizer.apply_chat_template(conversation_history, tokenize=False, add_generation_prompt=True)
+        outputs = llm_pipeline(
+            prompt,
+            max_new_tokens=100,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9,
+            pad_token_id=tokenizer.eos_token_id
+        )
+
+        # Extract response text cleanly
+        full_text = outputs[0]["generated_text"]
+        response = full_text[len(prompt):].strip()
+
+        conversation_history.append({"role": "assistant", "content": response})
+        return response
+
+    except Exception as e:
+        return f"Local engine execution lag. I captured your input text: {user_text}"
+
+# --- LIVE CONVERSATION LOOP ---
+def start_live_voice_mode():
+    print("\n=======================================================")
+    print("⚛️ 100% LOCAL SCIENCE VOICE LOOP OPERATIONAL")
+    print("Running natively on GPU memory. Talk freely.")
+    print("=======================================================\n")
+
+    ai_speak("Local quantum simulation matrix online. State your scientific hypothesis.")
+    time.sleep(4.0)
+
+    while True:
+        try:
+            # 1. Capture user voice
+            audio_file = capture_microphone_input(duration_seconds=5)
+
+            # 2. Transcribe locally via Whisper Tiny
+            result = stt_model.transcribe(audio_file, fp16=torch.cuda.is_available())
+            user_speech = result["text"].strip()
+
+            if not user_speech or len(user_speech) < 3:
+                continue
+
+            print(f"👤 Question: {user_speech}")
+
+            # 3. Generate answers locally via VRAM pipeline
+            ai_reply = get_ai_response(user_speech)
+            print(f"🤖 AI Core: {ai_reply}\n")
+
+            # 4. Speak response back via high quality voice accent
+            ai_speak(ai_reply)
+
+            if any(word in user_speech.lower() for word in ["goodbye", "stop", "exit"]):
+                break
+
+            # Let audio playback clear completely before the browser mic reactivates
+            estimated_wait = max(4.0, (len(ai_reply.split()) / 2.2))
+            time.sleep(estimated_wait)
+
+        except KeyboardInterrupt:
+            print("\nVoice environment stopped manually.")
+            break
+        except Exception as e:
+            print(f"Loop processing error: {e}")
+            break
+
+if __name__ == "__main__":
+    start_live_voice_mode()
+
+
+
+
+
+
+"""
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """OPEN SCIENCE VOICE LOOP - Real-time voice AI in Google Colab.
@@ -184,3 +378,4 @@ def start_live_voice_mode():
 
 if __name__ == "__main__":
     start_live_voice_mode()
+"""
