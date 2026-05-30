@@ -448,3 +448,54 @@ git push -u origin main
 
 5. **Test the Colab link** – after pushing, the badge will point to:
    `https://colab.research.google.com/github/OmegaPrimej/OPEN-SCIENCE-VOICE-LOOP-ACTIVE/blob/main/src/voice_assistant.py`
+
+
+# 🎙️ Open Science Voice Loop
+
+Real‑time voice AI assistant running entirely in **Google Colab** – no API keys, local LLM.
+
+## ✨ Features
+
+- 🎤 Speech recognition (Whisper tiny.en)
+- 🧠 Local LLM (Qwen2.5‑3B‑Instruct)
+- 🔊 British text‑to‑speech (edge‑tts)
+- 💾 Rolling conversation memory
+- ⚡ Runs on a free T4 GPU
+
+## 🚀 One‑click launch
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/OmegaPrimej/OPEN-SCIENCE-VOICE-LOOP-ACTIVE/blob/main/src/voice_assistant.py)
+
+> The first run downloads ~6 GB of models – it takes 2‑3 minutes.
+
+## 🛠️ Local development
+
+1. Clone the repo  
+   `git clone https://github.com/OmegaPrimej/OPEN-SCIENCE-VOICE-LOOP-ACTIVE.git`
+2. Install dependencies  
+   `pip install -r requirements.txt` (if you create one)  
+   or just run the Colab notebook.
+
+## ❓ FAQ
+
+**Why not use a cloud API?**  
+This is fully local after the first download – no usage limits, no keys.
+
+**Can I use a smaller model?**  
+Yes – edit `model_id` in `src/voice_assistant.py` to e.g. `"Qwen/Qwen2.5-1.5B-Instruct"`.
+
+**TTS doesn’t work?**  
+Check internet – edge‑tts calls Microsoft servers. Offline TTS could be added later.
+
+**Microphone not working?**  
+Allow microphone permission for colab.research.google.com in your browser.
+
+## 📄 License
+
+MIT – free to use, modify, distribute.
+
+## 🙏 Acknowledgements
+
+- [Whisper](https://github.com/openai/whisper)
+- [Qwen](https://github.com/QwenLM/Qwen)
+- [edge‑tts](https://github.com/rany2/edge-tts)
