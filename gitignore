@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Colab / local
+*.wav
+*.mp3
+*.ipynb_checkpoints/
+.ipynb_checkpoints/
+
+# Config local override
+configs/local_config.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
