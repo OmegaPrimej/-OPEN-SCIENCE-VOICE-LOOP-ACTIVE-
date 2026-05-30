@@ -1,0 +1,8 @@
+# Model configuration for Open Science Voice Loop
+
+model_id: "Qwen/Qwen2.5-3B-Instruct"
+torch_dtype: "float16"
+max_new_tokens: 100
+temperature: 0.7
+top_p: 0.9
+system_prompt: "You are an expert scientist. Answer briefly in 2-3 sentences."
